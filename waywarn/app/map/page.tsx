@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useCallback, useRef, useState } from "react";
+import React, { useEffect, useCallback, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import BottomNav from "@/components/BottomNav/BottomNav";
 import SearchBar from "@/components/SearchBar/SearchBar";
 import RouteCard from "@/components/RouteCard/RouteCard";
+import DemoTour, { DemoScenario } from "@/components/DemoTour/DemoTour";
 import styles from "./map.module.css";
 import type { Map as LMap, Polyline as LPolyline } from "leaflet";
 import { Route, Hazard } from "@/types";
@@ -18,12 +19,27 @@ import AlertModal from "@/components/AlertModal/AlertModal";
 import { AlertItem, NavigationState } from "@/types";
 import { saveRoutes, saveSelectedRoute } from "@/lib/routeStore";
 import Speedometer from "@/components/Speedometer/Speedometer";
+import { LatLng } from "@/types";
 
 // Dynamically import LeafletMap — client-side only
 const MapComponent = dynamic(
   () => import("@/components/LeafletMap/LeafletMap"),
   { ssr: false, loading: () => <div className={styles.mapLoading}>🗺️ Loading map...</div> }
 );
+
+// Single demo route — India Gate → Qutub Minar
+// Coords are hardcoded so geocoding is never called for the demo
+const DEMO_SCENARIO: DemoScenario = {
+  id: "classic",
+  icon: "🏛️",
+  label: "Classic Delhi Tour",
+  sub: "India Gate → Qutub Minar",
+  origin: "India Gate, New Delhi",
+  destination: "Qutub Minar, New Delhi",
+  color: "#4f46e5",
+  originCoords: { lat: 28.6129, lng: 77.2295 }, // India Gate
+  destCoords:   { lat: 28.5245, lng: 77.1855 }, // Qutub Minar
+};
 
 export default function MapPage() {
   const { user, loading, isDemo } = useAuth();
@@ -43,6 +59,8 @@ export default function MapPage() {
   const [predicting, setPredicting] = useState(false);
   const [navState, setNavState] = useState<NavigationState | null>(null);
   const [activeAlert, setActiveAlert] = useState<AlertItem | null>(null);
+  const [tourOpen, setTourOpen] = useState(true);
+  const [activeDemoId, setActiveDemoId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gpsDotRef = useRef<any>(null);
   const navEngineRef = useRef<NavigationEngine | null>(null);
@@ -158,6 +176,78 @@ export default function MapPage() {
     });
   }, []);
 
+  // Helper — update hazardCount + riskScore on all routes after AI prediction
+  const applyAiHazardsToRoutes = useCallback(
+    (allRoutes: Route[], targetRoute: Route, potholes: Hazard[]) => {
+      const aiCount = potholes.length;
+      const density = aiCount / Math.max(targetRoute.distanceKm, 1);
+      const densityToRisk = (d: number) => Math.min(100, Math.round(d * 33));
+      return allRoutes.map((r) => {
+        if (r.id === targetRoute.id) {
+          return { ...r, hazardCount: aiCount, riskScore: densityToRisk(density) };
+        }
+        const estimated = Math.round(density * r.distanceKm * (0.75 + Math.random() * 0.5));
+        const estDensity = estimated / Math.max(r.distanceKm, 1);
+        return { ...r, hazardCount: estimated, riskScore: densityToRisk(estDensity) };
+      });
+    },
+    []
+  );
+
+  // ─── Core routing pipeline ───────────────────────────────────────────────
+  // Shared by both handleSearch (after geocoding) and handleDemoScenario
+  // (which skips geocoding entirely by passing hardcoded coords).
+  const runRouting = useCallback(
+    async (originCoords: LatLng, destCoords: LatLng) => {
+      // 1. Fetch routes from OSRM
+      const osrmRoutes = await fetchOSRMRoutes(originCoords, destCoords);
+      if (!osrmRoutes.length) throw new Error("No routes found between these locations.");
+
+      // 2. Count hazards per route
+      const hazardCounts = osrmRoutes.map((r) =>
+        countHazardsAlongRoute(
+          hazards,
+          r.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
+        )
+      );
+
+      // 3. Build scored Route objects
+      const builtRoutes = buildRoutes(osrmRoutes, hazardCounts);
+      const sorted = [...builtRoutes].sort((a, b) => a.riskScore - b.riskScore);
+      sorted[0].label = "Safest";
+      sorted[1] && (sorted[1].label = builtRoutes.length > 1 ? "Fastest" : "Shortest");
+      sorted[2] && (sorted[2].label = "Shortest");
+
+      const best = sorted[0];
+      setRoutes(sorted);
+      setSelectedRoute(best);
+      saveRoutes(sorted);
+      saveSelectedRoute(best);
+      setSheetOpen(true);
+      await drawRoutes(sorted, best);
+
+      // Run AI prediction in background
+      setPredicting(true);
+      predictPotholes(best.coordinates, best.distanceKm)
+        .then((potholes) => {
+          setAiHazards(potholes);
+          drawAiMarkers(potholes);
+          setRoutes((prev) => {
+            const updated = applyAiHazardsToRoutes(prev, best, potholes);
+            saveRoutes(updated);
+            return updated;
+          });
+          setSelectedRoute((prev) =>
+            prev ? { ...prev, hazardCount: potholes.length } : prev
+          );
+        })
+        .catch(console.warn)
+        .finally(() => setPredicting(false));
+    },
+    [hazards, drawRoutes, drawAiMarkers, applyAiHazardsToRoutes]
+  );
+
+  // Normal search — geocodes user input then calls runRouting
   const handleSearch = useCallback(
     async (origin: string, destination: string) => {
       setSearchLoading(true);
@@ -166,59 +256,50 @@ export default function MapPage() {
       setSheetOpen(false);
 
       try {
-        // 1. Geocode both ends
-        const [originCoords, destCoords] = await Promise.all([
+        const [oCoords, dCoords] = await Promise.all([
           geocode(origin),
           geocode(destination),
         ]);
 
-        if (!originCoords) throw new Error(`Could not find "${origin}". Try a more specific location in India.`);
-        if (!destCoords) throw new Error(`Could not find "${destination}". Try a more specific location in India.`);
+        if (!oCoords) throw new Error(`Could not find "${origin}". Try a more specific location in India.`);
+        if (!dCoords) throw new Error(`Could not find "${destination}". Try a more specific location in India.`);
 
-        // 2. Fetch routes from OSRM
-        const osrmRoutes = await fetchOSRMRoutes(originCoords, destCoords);
-        if (!osrmRoutes.length) throw new Error("No routes found between these locations.");
-
-        // 3. Count hazards per route
-        const hazardCounts = osrmRoutes.map((r) =>
-          countHazardsAlongRoute(
-            hazards,
-            r.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
-          )
-        );
-
-        // 4. Build scored Route objects
-        const builtRoutes = buildRoutes(osrmRoutes, hazardCounts);
-        // Sort: Safest first
-        const sorted = [...builtRoutes].sort((a, b) => a.riskScore - b.riskScore);
-        sorted[0].label = "Safest";
-        sorted[1] && (sorted[1].label = builtRoutes.length > 1 ? "Fastest" : "Shortest");
-        sorted[2] && (sorted[2].label = "Shortest");
-
-        const best = sorted[0];
-        setRoutes(sorted);
-        setSelectedRoute(best);
-        saveRoutes(sorted);       // persist for routes comparison page
-        saveSelectedRoute(best);
-        setSheetOpen(true);
-        await drawRoutes(sorted, best);
-
-        // Run AI prediction in background (non-blocking)
-        setPredicting(true);
-        predictPotholes(best.coordinates, best.distanceKm)
-          .then((potholes) => {
-            setAiHazards(potholes);
-            drawAiMarkers(potholes);
-          })
-          .catch(console.warn)
-          .finally(() => setPredicting(false));
+        await runRouting(oCoords, dCoords);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Routing failed. Please try again.");
       } finally {
         setSearchLoading(false);
       }
     },
-    [hazards, drawRoutes]
+    [runRouting]
+  );
+
+  // Demo handler — uses pre-resolved coords, NEVER calls the geocoder
+  const handleDemoScenario = useCallback(
+    async (scenario: DemoScenario) => {
+      setActiveDemoId(scenario.id);
+      setTourOpen(false);
+      setSearchLoading(true);
+      setError(null);
+      setRoutes([]);
+      setSheetOpen(false);
+
+      try {
+        // Use hardcoded coords when present (avoids Nominatim rate-limit issues)
+        const originCoords: LatLng = scenario.originCoords ?? (await geocode(scenario.origin))!;
+        const destCoords:   LatLng = scenario.destCoords   ?? (await geocode(scenario.destination))!;
+
+        if (!originCoords) throw new Error("Could not resolve demo origin.");
+        if (!destCoords)   throw new Error("Could not resolve demo destination.");
+
+        await runRouting(originCoords, destCoords);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Demo routing failed. Please try again.");
+      } finally {
+        setSearchLoading(false);
+      }
+    },
+    [runRouting]
   );
 
   const handleSelectRoute = useCallback(
@@ -231,11 +312,20 @@ export default function MapPage() {
         .then((potholes) => {
           setAiHazards(potholes);
           drawAiMarkers(potholes);
+          // ✅ Update all RouteCards with new hazard counts
+          setRoutes((prev) => {
+            const updated = applyAiHazardsToRoutes(prev, route, potholes);
+            saveRoutes(updated);
+            return updated;
+          });
+          setSelectedRoute((prev) =>
+            prev ? { ...prev, hazardCount: potholes.length } : prev
+          );
         })
         .catch(console.warn)
         .finally(() => setPredicting(false));
     },
-    [routes, drawRoutes, drawAiMarkers]
+    [routes, drawRoutes, drawAiMarkers, applyAiHazardsToRoutes]
   );
 
   if (loading || !user) return null;
@@ -259,10 +349,17 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Demo badge + AI prediction badge */}
+      {/* Demo badge (shows after tour closed, before route sheet opens) */}
       <div className={styles.badges}>
-        {isDemo && !sheetOpen && (
-          <div className={styles.demoBadge}>🎮 Demo Mode — New Delhi</div>
+        {isDemo && !sheetOpen && !tourOpen && (
+          <button
+            className={styles.demoBadgeBtn}
+            onClick={() => setTourOpen(true)}
+            disabled={searchLoading}
+            title="Open demo guide"
+          >
+            🎮 Demo Mode — New Delhi
+          </button>
         )}
         {predicting && (
           <div className={styles.aiBadge}>🤖 AI predicting potholes...</div>
@@ -273,6 +370,17 @@ export default function MapPage() {
           </div>
         )}
       </div>
+
+      {/* Guided Demo Tour Overlay */}
+      {isDemo && tourOpen && !navState?.isActive && (
+        <DemoTour
+          scenario={DEMO_SCENARIO}
+          onPickScenario={handleDemoScenario}
+          onSkip={() => setTourOpen(false)}
+          searchLoading={searchLoading}
+          activeDemoId={activeDemoId}
+        />
+      )}
 
 
       {/* Live nav progress HUD */}

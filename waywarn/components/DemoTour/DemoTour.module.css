@@ -1,0 +1,1155 @@
+/* DemoTour.module.css — Enhanced Interactive Beginner Onboarding */
+
+/* ── Overlay ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: overlayIn 0.35s ease;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Card ── */
+.card {
+  width: 100%;
+  max-width: 500px;
+  background: linear-gradient(160deg, #1a1d27 0%, #0f1119 100%);
+  border-radius: 28px 28px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 92dvh;
+  overflow: hidden;
+  animation: cardUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+}
+
+@keyframes cardUp {
+  from { transform: translateY(80px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerLogo {
+  font-size: 1.2rem;
+}
+
+.headerBrand {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.headerGuide {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.closeBtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* ── Progress bar ── */
+.progressWrap {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 0 2px 2px 0;
+}
+
+.stepCount {
+  text-align: center;
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 500;
+  padding: 6px 0 2px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* ── Scrollable body ── */
+.scrollBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 18px 4px;
+  scrollbar-width: none;
+}
+.scrollBody::-webkit-scrollbar { display: none; }
+
+/* ── Content animation ── */
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.slideInRight {
+  animation: slideInRight 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.slideInLeft {
+  animation: slideInLeft 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Tag  ── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* ── Emoji ── */
+.emojiWrap {
+  margin: 4px 0 2px;
+}
+
+.emoji {
+  font-size: 2.8rem;
+  line-height: 1;
+  display: block;
+  animation: emojiBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes emojiBounce {
+  from { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg);     opacity: 1; }
+}
+
+/* ── Typography ── */
+.title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f9fafb;
+  margin: 4px 0 0;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.subtitle {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 2px 0 0;
+  font-weight: 500;
+}
+
+.body {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.65;
+  margin: 8px auto 0;
+  max-width: 360px;
+}
+
+/* ── Mock wrap ── */
+.mockWrap {
+  width: 100%;
+  max-width: 360px;
+  margin: 10px auto 2px;
+}
+
+/* ── Symbol legend table ── */
+.symbolTable {
+  width: 100%;
+  max-width: 360px;
+  margin: 10px auto 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: left;
+}
+
+.symbolTableHeader {
+  padding: 8px 14px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.symbolRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s;
+}
+.symbolRow:last-child { border-bottom: none; }
+.symbolRow:hover { background: rgba(255, 255, 255, 0.03); }
+
+.symbolIcon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.symbolInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.symbolLabel {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.symbolDesc {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.4;
+  margin-top: 1px;
+}
+
+/* ────────────── MOCK COMPONENTS ────────────── */
+
+/* Mock Route Card */
+.mockCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 14px;
+  text-align: left;
+}
+
+.mockCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mockEmoji { font-size: 1rem; }
+
+.mockLabel {
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.mockDesc {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  flex: 1;
+}
+
+.mockActive {
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mockStats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.mockStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 2px;
+}
+
+.mockVal {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #f9fafb;
+}
+
+.mockStatLabel {
+  font-size: 0.625rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mockDivider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mockRiskRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mockRiskLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.mockRiskTrack {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mockRiskFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s ease;
+}
+
+.mockRiskNum {
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 26px;
+  text-align: right;
+}
+
+/* Mock Risk Bar Demo */
+.mockRiskDemo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.mockRiskRow2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mockRiskName {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.mockRiskAnimate {
+  animation: growBar 1s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes growBar {
+  from { width: 0 !important; }
+}
+
+/* Mock AI Dot */
+.mockAiWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.mockMapBg {
+  position: relative;
+  width: 100%;
+  height: 90px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.mockRoute {
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  top: 50%;
+  height: 3px;
+  background: linear-gradient(90deg, #22c55e, #6366f1);
+  border-radius: 999px;
+  transform: translateY(-50%);
+  opacity: 0.7;
+}
+
+.mockAiDot {
+  position: absolute;
+  left: 40%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background: rgba(168, 85, 247, 0.9);
+  border: 1.5px solid #c084fc;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.8), 0 0 24px rgba(168, 85, 247, 0.4);
+}
+
+.mockAiRing {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(168, 85, 247, 0.5);
+  animation: aiPulse 1.4s ease-out infinite;
+}
+
+.mockAiDot2 {
+  position: absolute;
+  left: 65%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background: rgba(168, 85, 247, 0.7);
+  border: 1.5px solid #c084fc;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+}
+
+.mockAiRing2 {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(168, 85, 247, 0.4);
+  animation: aiPulse 1.4s ease-out 0.7s infinite;
+}
+
+.mockOrangeMarker {
+  position: absolute;
+  left: 25%;
+  top: 30%;
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.6));
+}
+
+@keyframes aiPulse {
+  0%   { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.mockAiBadge {
+  font-size: 0.725rem;
+  font-weight: 600;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #c084fc;
+  border-radius: 999px;
+  padding: 5px 14px;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
+}
+
+/* Mock Alert Toast */
+.mockToast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 17, 25, 0.95);
+  border: 1.5px solid #ef4444;
+  border-radius: 14px;
+  padding: 12px 14px;
+  overflow: hidden;
+}
+
+.mockPulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: pulseGlow 1s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50%       { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+}
+
+.mockToastEmoji { font-size: 1.4rem; flex-shrink: 0; }
+
+.mockToastText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.mockToastType {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #f9fafb;
+  letter-spacing: 0.04em;
+}
+
+.mockToastDist {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mockSeverity {
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 999px;
+  padding: 3px 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mockProgressBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #ef4444;
+  border-radius: 0 2px 2px 0;
+  animation: progressShrink 2s linear infinite;
+}
+
+@keyframes progressShrink {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* Mock Bottom Nav */
+.mockNav {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  padding: 6px 4px;
+  gap: 2px;
+}
+
+.mockTab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  cursor: default;
+  position: relative;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+
+.mockTabActive {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.mockTabIcon { font-size: 1.1rem; }
+
+.mockTabLabel {
+  font-size: 0.5625rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+.mockTabActive .mockTabLabel {
+  color: #6366f1;
+  font-weight: 700;
+}
+
+.mockIndicator {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 3px;
+  background: #6366f1;
+  border-radius: 999px;
+}
+
+/* Mock Speedometer */
+.mockHud {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px 18px;
+  width: 100%;
+}
+
+.mockSpeed {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mockSpeedArc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.07);
+  border-top-color: #6366f1;
+  border-right-color: #6366f1;
+  animation: spinArc 2s linear infinite;
+}
+
+@keyframes spinArc {
+  to { transform: rotate(360deg); }
+}
+
+.mockSpeedNum {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f9fafb;
+  line-height: 1;
+  z-index: 1;
+}
+
+.mockSpeedUnit {
+  font-size: 0.5rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  z-index: 1;
+}
+
+.mockHudInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mockNavStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+}
+
+.mockNavDot {
+  width: 7px;
+  height: 7px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: navBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes navBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.mockProgress {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.mockProgressTrack {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mockProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 999px;
+  animation: navProgress 3s ease infinite alternate;
+}
+
+@keyframes navProgress {
+  from { width: 20%; }
+  to   { width: 90%; }
+}
+
+/* Mock Search Bar */
+.mockSearch {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.mockSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.mockSearchIcon { font-size: 1rem; flex-shrink: 0; }
+
+.mockSearchInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.mockSearchPlaceholder {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.mockSearchDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 14px;
+}
+
+.mockSearchBtn {
+  display: block;
+  width: calc(100% - 8px);
+  margin: 6px 4px 4px;
+  padding: 11px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: default;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+  font-family: inherit;
+}
+
+/* ─── Scenario cards ─── */
+.scenarios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  width: 100%;
+  max-width: 380px;
+  text-align: left;
+}
+
+.scenarioCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s, box-shadow 0.18s;
+  position: relative;
+  overflow: hidden;
+}
+
+.scenarioCard::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--card-color, #4f46e5);
+  border-radius: 3px 0 0 3px;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+
+.scenarioCard:hover {
+  border-color: var(--card-color, #4f46e5);
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(3px);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+.scenarioCard:hover::before { opacity: 1; }
+.scenarioCard:active { transform: scale(0.98); }
+.scenarioCard:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.scenarioActive {
+  border-color: var(--card-color, #4f46e5) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.scenarioActive::before { opacity: 1 !important; }
+
+.sIcon {
+  font-size: 1.25rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.sText { flex: 1; min-width: 0; }
+
+.sLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #f9fafb;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sSub {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sArrow {
+  font-size: 1.375rem;
+  color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  transition: transform 0.18s, color 0.18s;
+}
+
+.scenarioCard:hover .sArrow {
+  transform: translateX(3px);
+  color: var(--card-color, #4f46e5);
+}
+
+.sSpinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Footer ─── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.skipBtn {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 6px 0;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.skipBtn:hover { color: rgba(255, 255, 255, 0.6); }
+
+/* Step dots — compact */
+.stepDots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, width 0.25s, border-radius 0.25s;
+  flex-shrink: 0;
+}
+
+.dotActive {
+  width: 18px;
+  border-radius: 4px;
+  background: #6366f1;
+}
+
+.dotDone {
+  background: rgba(99, 102, 241, 0.4);
+}
+
+.navBtns {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.prevBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.125rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.prevBtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.nextBtn {
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.nextBtn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+}
+
+.nextBtn:active {
+  transform: translateY(0);
+}
+
+/* ─── Single Demo Launch ─── */
+.singleDemoWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.demoRoutePreview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.07);
+  width: 100%;
+  text-align: left;
+  animation: routePreviewIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes routePreviewIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.demoRouteIcon {
+  font-size: 2rem;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.demoRouteInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.demoRouteName {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #f9fafb;
+  letter-spacing: -0.01em;
+}
+
+.demoRouteSub {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+.startDemoBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 15px 24px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  box-shadow: 0 6px 24px rgba(79, 70, 229, 0.45), 0 0 0 1px rgba(255,255,255,0.08) inset;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.startDemoBtn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 32px rgba(79, 70, 229, 0.55);
+}
+
+.startDemoBtn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.startDemoBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.startDemoBtnLoading {
+  background: linear-gradient(135deg, #3730a3, #5b21b6);
+}

@@ -12,6 +12,9 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
 } from "firebase/auth";
 import { auth, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
 import { UserProfile } from "@/types";
@@ -29,6 +32,8 @@ interface AuthContextType {
   loading: boolean;
   isDemo: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -37,6 +42,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isDemo: false,
   signInWithGoogle: async () => {},
+  signInWithEmail: async () => {},
+  signUpWithEmail: async () => {},
   signOut: async () => {},
 });
 
@@ -47,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
-      // Demo mode — auto-login with demo user
-      setUser(DEMO_USER);
+      // Demo mode — do NOT auto-login; let the user interact with the login page.
+      // They must click "Continue in Demo Mode" to proceed.
       setLoading(false);
       return;
     }
@@ -72,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     if (!isFirebaseConfigured || !auth) {
-      // Demo mode: instant sign-in
       setUser(DEMO_USER);
       return;
     }
@@ -87,7 +93,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } catch (err) {
       console.error("Google sign-in failed:", err);
+      throw err;
     }
+  };
+
+  const signInWithEmail = async (email: string, password: string) => {
+    if (!isFirebaseConfigured || !auth) {
+      setUser({ ...DEMO_USER, email });
+      return;
+    }
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    const u = result.user;
+    setUser({
+      uid: u.uid,
+      displayName: u.displayName,
+      email: u.email,
+      photoURL: u.photoURL,
+    });
+  };
+
+  const signUpWithEmail = async (name: string, email: string, password: string) => {
+    if (!isFirebaseConfigured || !auth) {
+      setUser({ ...DEMO_USER, displayName: name, email });
+      return;
+    }
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(result.user, { displayName: name });
+    const u = result.user;
+    setUser({
+      uid: u.uid,
+      displayName: name,
+      email: u.email,
+      photoURL: u.photoURL,
+    });
   };
 
   const signOut = async () => {
@@ -104,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isDemo, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isDemo, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
       {children}
     </AuthContext.Provider>
   );
