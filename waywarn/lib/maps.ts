@@ -72,9 +72,10 @@ export function haversineMetres(a: LatLng, b: LatLng): number {
 
 // Route colors
 const ROUTE_COLORS: Record<RouteLabel, string> = {
-  Safest:   "#38ef7d",
-  Fastest:  "#ffd200",
-  Shortest: "#ff5f6d",
+  Safest:          "#38ef7d",
+  Fastest:         "#ffd200",
+  Shortest:        "#ff5f6d",
+  "Weather-Safe":  "#0ea5e9",
 };
 
 // --- Build scored Route objects from OSRM results ---

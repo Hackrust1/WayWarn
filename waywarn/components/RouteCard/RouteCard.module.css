@@ -108,3 +108,50 @@
   text-align: right;
   flex-shrink: 0;
 }
+
+/* ── Environmental / Satellite Risk row ── */
+.envRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.envIcon {
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.envLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.envBar {
+  flex: 1;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.envFill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.envChip {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

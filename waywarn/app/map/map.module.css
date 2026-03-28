@@ -529,3 +529,127 @@
 .stopBtn:active {
   transform: scale(1);
 }
+
+/* ==============================================
+   🛰️ Satellite Hazard Intelligence
+   ============================================== */
+
+/* Floating satellite toggle button — bottom-right above BottomNav */
+.satToggleBtn {
+  position: absolute;
+  bottom: 76px;
+  right: 14px;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(14, 165, 233, 0.35);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #0284c7;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 16px rgba(14, 165, 233, 0.18), 0 1px 4px rgba(0,0,0,0.06);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.satToggleBtn:hover {
+  background: rgba(14, 165, 233, 0.08);
+  border-color: rgba(14, 165, 233, 0.55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.28);
+}
+
+.satToggleBtn:active {
+  transform: translateY(0);
+}
+
+/* Active state — satellite layer ON */
+.satToggleBtnOn {
+  background: rgba(14, 165, 233, 0.14);
+  border-color: rgba(14, 165, 233, 0.6);
+  color: #0369a1;
+  box-shadow:
+    0 0 0 3px rgba(14, 165, 233, 0.12),
+    0 4px 20px rgba(14, 165, 233, 0.3);
+  animation: satPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes satPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12), 0 4px 20px rgba(14, 165, 233, 0.25); }
+  50%       { box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.2),  0 4px 22px rgba(14, 165, 233, 0.38); }
+}
+
+/* Satellite scanning dot animation */
+.satDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  box-shadow: 0 0 6px rgba(14, 165, 233, 0.8);
+  flex-shrink: 0;
+}
+
+.satToggleBtnOn .satDot {
+  animation: satScan 1.2s ease-in-out infinite;
+}
+
+@keyframes satScan {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* Loading badge while satellite zones compute */
+.satLoadingBadge {
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  color: #0284c7;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+
+/* Zone count badge — shown after zones load */
+.satZoneBadge {
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.32);
+  color: #0369a1;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+
+/* Weather condition pill */
+.weatherPill {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--text-muted);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+

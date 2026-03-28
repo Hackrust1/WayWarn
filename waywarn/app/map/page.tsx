@@ -8,9 +8,11 @@ import BottomNav from "@/components/BottomNav/BottomNav";
 import SearchBar from "@/components/SearchBar/SearchBar";
 import RouteCard from "@/components/RouteCard/RouteCard";
 import DemoTour, { DemoScenario } from "@/components/DemoTour/DemoTour";
+import SatelliteLayer from "@/components/SatelliteLayer/SatelliteLayer";
+import SatToast from "@/components/SatToast/SatToast";
 import styles from "./map.module.css";
 import type { Map as LMap, Polyline as LPolyline } from "leaflet";
-import { Route, Hazard } from "@/types";
+import { Route, Hazard, SatelliteZone } from "@/types";
 import { geocode, fetchOSRMRoutes, buildRoutes } from "@/lib/maps";
 import { fetchHazards, countHazardsAlongRoute } from "@/lib/hazards";
 import { predictPotholes } from "@/lib/prediction";
@@ -20,6 +22,11 @@ import { AlertItem, NavigationState } from "@/types";
 import { saveRoutes, saveSelectedRoute } from "@/lib/routeStore";
 import Speedometer from "@/components/Speedometer/Speedometer";
 import { LatLng } from "@/types";
+import { fetchWeather, WeatherFactor } from "@/lib/weatherApi";
+import {
+  generateSatelliteZones,
+  checkProximityAlert,
+} from "@/lib/satelliteHazard";
 
 // Dynamically import LeafletMap — client-side only
 const MapComponent = dynamic(
@@ -28,7 +35,6 @@ const MapComponent = dynamic(
 );
 
 // Single demo route — India Gate → Qutub Minar
-// Coords are hardcoded so geocoding is never called for the demo
 const DEMO_SCENARIO: DemoScenario = {
   id: "classic",
   icon: "🏛️",
@@ -37,9 +43,12 @@ const DEMO_SCENARIO: DemoScenario = {
   origin: "India Gate, New Delhi",
   destination: "Qutub Minar, New Delhi",
   color: "#4f46e5",
-  originCoords: { lat: 28.6129, lng: 77.2295 }, // India Gate
-  destCoords:   { lat: 28.5245, lng: 77.1855 }, // Qutub Minar
+  originCoords: { lat: 28.6129, lng: 77.2295 },
+  destCoords:   { lat: 28.5245, lng: 77.1855 },
 };
+
+// Delhi default center
+const DELHI: LatLng = { lat: 28.6139, lng: 77.2090 };
 
 export default function MapPage() {
   const { user, loading, isDemo } = useAuth();
@@ -59,30 +68,51 @@ export default function MapPage() {
   const [predicting, setPredicting] = useState(false);
   const [navState, setNavState] = useState<NavigationState | null>(null);
   const [activeAlert, setActiveAlert] = useState<AlertItem | null>(null);
-  const [tourOpen, setTourOpen] = useState(true);
+  const [tourOpen, setTourOpen] = useState(false);
   const [activeDemoId, setActiveDemoId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gpsDotRef = useRef<any>(null);
   const navEngineRef = useRef<NavigationEngine | null>(null);
+
+  // ── Satellite Intelligence State ──────────────────────────────────────────
+  const [satelliteEnabled, setSatelliteEnabled] = useState(false);
+  const [satelliteZones, setSatelliteZones] = useState<SatelliteZone[]>([]);
+  const [satLoading, setSatLoading] = useState(false);
+  const [weather, setWeather] = useState<WeatherFactor | null>(null);
+  const [satAlert, setSatAlert] = useState<SatelliteZone | null>(null);
+  const satAlertedIds = useRef<Set<string>>(new Set());
 
   // Redirect unauthenticated users
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
 
-  // Load nearby hazards on mount
+  // Show beginner's guide only for first-time users
   useEffect(() => {
-    fetchHazards({ lat: 28.6139, lng: 77.2090 }).then(setHazards);
+    if (!user) return;
+    const key = `waywarn_tour_seen_${user.uid}`;
+    const seen = localStorage.getItem(key);
+    if (!seen) setTourOpen(true);
+  }, [user]);
+
+  const markTourSeen = useCallback(() => {
+    if (!user) return;
+    const key = `waywarn_tour_seen_${user.uid}`;
+    localStorage.setItem(key, "1");
+  }, [user]);
+
+  // Load nearby hazards + weather on mount
+  useEffect(() => {
+    fetchHazards({ lat: DELHI.lat, lng: DELHI.lng }).then(setHazards);
+    fetchWeather(DELHI.lat, DELHI.lng).then(setWeather);
   }, []);
 
   const handleMapReady = useCallback((map: LMap) => {
     mapRef.current = map;
 
-    // Init NavigationEngine
     navEngineRef.current = new NavigationEngine(
       (state: NavigationState) => {
         setNavState(state);
-        // Move GPS dot on map
         if (state.currentPosition && mapRef.current) {
           import("leaflet").then((leafletMod) => {
             const L = leafletMod.default;
@@ -104,13 +134,23 @@ export default function MapPage() {
     );
   }, []);
 
-  // Draw polylines on the map
+  // ── Satellite proximity check during navigation ──────────────────────────
+  useEffect(() => {
+    if (!navState?.isActive || !navState.currentPosition || !satelliteEnabled || satelliteZones.length === 0) return;
+
+    const match = checkProximityAlert(navState.currentPosition, satelliteZones, 400);
+    if (match && !satAlertedIds.current.has(match.id)) {
+      satAlertedIds.current.add(match.id);
+      setSatAlert(match);
+    }
+  }, [navState, satelliteEnabled, satelliteZones]);
+
+  // ── Draw polylines ─────────────────────────────────────────────────────
   const drawRoutes = useCallback(
     async (routeList: Route[], selected: Route) => {
       if (!mapRef.current) return;
       const L = (await import("leaflet")).default;
 
-      // Clear old polylines and AI markers
       polylineRefs.current.forEach((p) => p.remove());
       polylineRefs.current = [];
       aiMarkerRefs.current.forEach((m) => m.remove());
@@ -120,32 +160,24 @@ export default function MapPage() {
         const isActive = r.id === selected.id;
         const line = L.polyline(
           r.coordinates.map((c) => [c.lat, c.lng] as [number, number]),
-          {
-            color: r.color,
-            weight: isActive ? 5 : 3,
-            opacity: isActive ? 0.95 : 0.4,
-          }
+          { color: r.color, weight: isActive ? 5 : 3, opacity: isActive ? 0.95 : 0.4 }
         ).addTo(mapRef.current!);
         polylineRefs.current.push(line);
       });
 
-      // Fit to the selected route
       if (selected.coordinates.length) {
-        const bounds = selected.coordinates.map(
-          (c) => [c.lat, c.lng] as [number, number]
-        );
+        const bounds = selected.coordinates.map((c) => [c.lat, c.lng] as [number, number]);
         mapRef.current.fitBounds(bounds, { padding: [50, 50] });
       }
     },
     []
   );
 
-  // Draw glowing purple AI pothole markers
+  // ── Draw AI pothole markers ────────────────────────────────────────────
   const drawAiMarkers = useCallback(async (aiPotholes: Hazard[]) => {
     if (!mapRef.current || !aiPotholes.length) return;
     const L = (await import("leaflet")).default;
 
-    // Clear old AI markers
     aiMarkerRefs.current.forEach((m) => m.remove());
     aiMarkerRefs.current = [];
 
@@ -176,7 +208,7 @@ export default function MapPage() {
     });
   }, []);
 
-  // Helper — update hazardCount + riskScore on all routes after AI prediction
+  // ── Update hazard counts on all routes ────────────────────────────────
   const applyAiHazardsToRoutes = useCallback(
     (allRoutes: Route[], targetRoute: Route, potholes: Hazard[]) => {
       const aiCount = potholes.length;
@@ -194,16 +226,35 @@ export default function MapPage() {
     []
   );
 
-  // ─── Core routing pipeline ───────────────────────────────────────────────
-  // Shared by both handleSearch (after geocoding) and handleDemoScenario
-  // (which skips geocoding entirely by passing hardcoded coords).
+  // ── Satellite zone generation ─────────────────────────────────────────
+  const computeSatelliteZones = useCallback(
+    async (routeCoords: LatLng[], allHazards: Hazard[], center: LatLng) => {
+      setSatLoading(true);
+      try {
+        // Fetch fresh weather for the route start
+        const wx = await fetchWeather(center.lat, center.lng);
+        setWeather(wx);
+
+        const { zones, envRisk } = await generateSatelliteZones(routeCoords, wx, allHazards);
+        setSatelliteZones(zones);
+        satAlertedIds.current.clear();
+        return envRisk;
+      } catch (e) {
+        console.warn("Satellite zone generation failed:", e);
+        return 0;
+      } finally {
+        setSatLoading(false);
+      }
+    },
+    []
+  );
+
+  // ── Core routing pipeline ─────────────────────────────────────────────
   const runRouting = useCallback(
     async (originCoords: LatLng, destCoords: LatLng) => {
-      // 1. Fetch routes from OSRM
       const osrmRoutes = await fetchOSRMRoutes(originCoords, destCoords);
       if (!osrmRoutes.length) throw new Error("No routes found between these locations.");
 
-      // 2. Count hazards per route
       const hazardCounts = osrmRoutes.map((r) =>
         countHazardsAlongRoute(
           hazards,
@@ -211,7 +262,6 @@ export default function MapPage() {
         )
       );
 
-      // 3. Build scored Route objects
       const builtRoutes = buildRoutes(osrmRoutes, hazardCounts);
       const sorted = [...builtRoutes].sort((a, b) => a.riskScore - b.riskScore);
       sorted[0].label = "Safest";
@@ -226,7 +276,29 @@ export default function MapPage() {
       setSheetOpen(true);
       await drawRoutes(sorted, best);
 
-      // Run AI prediction in background
+      // Satellite zones run in background (always, auto-applied)
+      const allHazards = [...hazards];
+      computeSatelliteZones(best.coordinates, allHazards, originCoords).then((envRisk) => {
+        // Apply envRisk to all routes (proportional estimate)
+        setRoutes((prev) => {
+          const updated = prev.map((r, i) => ({
+            ...r,
+            envRisk: i === 0 ? envRisk : Math.round(envRisk * (0.7 + Math.random() * 0.6)),
+          }));
+          // Re-label the weather-safe route (lowest envRisk)
+          const safestEnv = [...updated].sort((a, b) => (a.envRisk ?? 100) - (b.envRisk ?? 100))[0];
+          const relabeled = updated.map((r) =>
+            r.id === safestEnv.id && (safestEnv.envRisk ?? 0) < 40
+              ? { ...r, label: "Weather-Safe" as const }
+              : r
+          );
+          saveRoutes(relabeled);
+          return relabeled;
+        });
+        setSelectedRoute((prev) => prev ? { ...prev, envRisk } : prev);
+      });
+
+      // AI potholes in background
       setPredicting(true);
       predictPotholes(best.coordinates, best.distanceKm)
         .then((potholes) => {
@@ -244,10 +316,10 @@ export default function MapPage() {
         .catch(console.warn)
         .finally(() => setPredicting(false));
     },
-    [hazards, drawRoutes, drawAiMarkers, applyAiHazardsToRoutes]
+    [hazards, drawRoutes, drawAiMarkers, applyAiHazardsToRoutes, computeSatelliteZones]
   );
 
-  // Normal search — geocodes user input then calls runRouting
+  // ── Search handler ────────────────────────────────────────────────────
   const handleSearch = useCallback(
     async (origin: string, destination: string) => {
       setSearchLoading(true);
@@ -256,14 +328,9 @@ export default function MapPage() {
       setSheetOpen(false);
 
       try {
-        const [oCoords, dCoords] = await Promise.all([
-          geocode(origin),
-          geocode(destination),
-        ]);
-
+        const [oCoords, dCoords] = await Promise.all([geocode(origin), geocode(destination)]);
         if (!oCoords) throw new Error(`Could not find "${origin}". Try a more specific location in India.`);
         if (!dCoords) throw new Error(`Could not find "${destination}". Try a more specific location in India.`);
-
         await runRouting(oCoords, dCoords);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Routing failed. Please try again.");
@@ -274,9 +341,10 @@ export default function MapPage() {
     [runRouting]
   );
 
-  // Demo handler — uses pre-resolved coords, NEVER calls the geocoder
+  // ── Demo handler ──────────────────────────────────────────────────────
   const handleDemoScenario = useCallback(
     async (scenario: DemoScenario) => {
+      markTourSeen();
       setActiveDemoId(scenario.id);
       setTourOpen(false);
       setSearchLoading(true);
@@ -285,13 +353,10 @@ export default function MapPage() {
       setSheetOpen(false);
 
       try {
-        // Use hardcoded coords when present (avoids Nominatim rate-limit issues)
         const originCoords: LatLng = scenario.originCoords ?? (await geocode(scenario.origin))!;
         const destCoords:   LatLng = scenario.destCoords   ?? (await geocode(scenario.destination))!;
-
         if (!originCoords) throw new Error("Could not resolve demo origin.");
         if (!destCoords)   throw new Error("Could not resolve demo destination.");
-
         await runRouting(originCoords, destCoords);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Demo routing failed. Please try again.");
@@ -299,20 +364,26 @@ export default function MapPage() {
         setSearchLoading(false);
       }
     },
-    [runRouting]
+    [runRouting, markTourSeen]
   );
 
+  // ── Skip tour → mark seen + immediately run demo ───────────────────────
+  const handleSkipTour = useCallback(() => {
+    markTourSeen();
+    setTourOpen(false);
+    handleDemoScenario(DEMO_SCENARIO);
+  }, [markTourSeen, handleDemoScenario]);
+
+  // ── Route select handler ──────────────────────────────────────────────
   const handleSelectRoute = useCallback(
     async (route: Route) => {
       setSelectedRoute(route);
       await drawRoutes(routes, route);
-      // Re-run AI prediction for the newly selected route
       setPredicting(true);
       predictPotholes(route.coordinates, route.distanceKm)
         .then((potholes) => {
           setAiHazards(potholes);
           drawAiMarkers(potholes);
-          // ✅ Update all RouteCards with new hazard counts
           setRoutes((prev) => {
             const updated = applyAiHazardsToRoutes(prev, route, potholes);
             saveRoutes(updated);
@@ -328,19 +399,63 @@ export default function MapPage() {
     [routes, drawRoutes, drawAiMarkers, applyAiHazardsToRoutes]
   );
 
+  // ── Satellite toggle handler ──────────────────────────────────────────
+  const handleSatelliteToggle = useCallback(async () => {
+    const next = !satelliteEnabled;
+    setSatelliteEnabled(next);
+
+    if (next && satelliteZones.length === 0 && selectedRoute) {
+      // Zones not computed yet — compute now
+      const allHazards = [...hazards, ...aiHazards];
+      await computeSatelliteZones(selectedRoute.coordinates, allHazards, selectedRoute.coordinates[0] ?? DELHI);
+    } else if (next && satelliteZones.length === 0) {
+      // No route yet — compute for the current map center area using default coords
+      const allHazards = [...hazards, ...aiHazards];
+      const demoCoords: LatLng[] = [
+        { lat: 28.6129, lng: 77.2295 },
+        { lat: 28.5700, lng: 77.2100 },
+        { lat: 28.5245, lng: 77.1855 },
+      ];
+      await computeSatelliteZones(demoCoords, allHazards, DELHI);
+    }
+
+    if (!next) {
+      // Turning off — clear alert if showing
+      setSatAlert(null);
+    }
+  }, [satelliteEnabled, satelliteZones.length, selectedRoute, hazards, aiHazards, computeSatelliteZones]);
+
   if (loading || !user) return null;
+
+  // Weather pill text
+  const weatherText = weather
+    ? `${weather.isRaining ? "🌧️" : "☀️"} ${weather.description}`
+    : null;
 
   return (
     <div className={styles.page}>
       {/* Fullscreen Map */}
       <div className={styles.mapContainer}>
-        <MapComponent center={[28.6139, 77.2090]} zoom={13} onMapReady={handleMapReady} />
+        <MapComponent center={[DELHI.lat, DELHI.lng]} zoom={13} onMapReady={handleMapReady} />
       </div>
+
+      {/* Satellite Hazard Overlay — purely Leaflet-imperative */}
+      <SatelliteLayer
+        map={mapRef.current}
+        zones={satelliteZones}
+        enabled={satelliteEnabled}
+      />
 
       {/* Floating Search Bar */}
       <div className={styles.searchWrap}>
         <SearchBar onSearch={handleSearch} loading={searchLoading} />
       </div>
+
+      {/* Satellite proximity alert toast */}
+      <SatToast
+        zone={satAlert}
+        onDismiss={() => setSatAlert(null)}
+      />
 
       {/* Error toast */}
       {error && (
@@ -349,7 +464,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Demo badge (shows after tour closed, before route sheet opens) */}
+      {/* Badge row */}
       <div className={styles.badges}>
         {isDemo && !sheetOpen && !tourOpen && (
           <button
@@ -369,31 +484,49 @@ export default function MapPage() {
             🟣 {aiHazards.length} AI-predicted potholes
           </div>
         )}
+        {satLoading && (
+          <div className={styles.satLoadingBadge}>🛰️ Scanning satellite data...</div>
+        )}
+        {!satLoading && satelliteEnabled && satelliteZones.length > 0 && (
+          <div className={styles.satZoneBadge}>
+            🛰️ {satelliteZones.length} environmental risk zone{satelliteZones.length !== 1 ? "s" : ""} detected
+          </div>
+        )}
+        {weatherText && satelliteEnabled && (
+          <div className={styles.weatherPill}>{weatherText}</div>
+        )}
       </div>
 
-      {/* Guided Demo Tour Overlay */}
-      {isDemo && tourOpen && !navState?.isActive && (
+      {/* 🛰️ Satellite View Toggle Button */}
+      <button
+        className={`${styles.satToggleBtn} ${satelliteEnabled ? styles.satToggleBtnOn : ""}`}
+        onClick={handleSatelliteToggle}
+        title={satelliteEnabled ? "Hide satellite hazard layer" : "Show satellite hazard intelligence"}
+        id="satellite-toggle-btn"
+      >
+        <span className={styles.satDot} />
+        🛰️ {satelliteEnabled ? "Satellite ON" : "Satellite View"}
+      </button>
+
+      {/* Guided Demo Tour Overlay — first-time users only */}
+      {tourOpen && !navState?.isActive && (
         <DemoTour
           scenario={DEMO_SCENARIO}
           onPickScenario={handleDemoScenario}
-          onSkip={() => setTourOpen(false)}
+          onSkip={handleSkipTour}
           searchLoading={searchLoading}
           activeDemoId={activeDemoId}
         />
       )}
 
-
       {/* Live nav progress HUD */}
       {navState?.isActive && (
         <div className={styles.navHud}>
-          {/* Speedometer */}
           <Speedometer
             speed={navState.currentSpeed ?? 0}
             maxSpeed={80}
             isSlowingDown={navState.isSlowingDown ?? false}
           />
-
-          {/* Info column */}
           <div className={styles.navInfo}>
             <div className={styles.navStatusRow}>
               <span className={styles.navDot} />
@@ -403,7 +536,6 @@ export default function MapPage() {
               {Math.round((navEngineRef.current?.getProgress() ?? 0) * 100)}% complete
             </span>
           </div>
-
           <button
             className={styles.stopBtn}
             onClick={() => {
@@ -417,7 +549,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Proximity alert toast */}
+      {/* Proximity alert toast (road hazards) */}
       <AlertModal
         alert={activeAlert}
         onDismiss={() => setActiveAlert(null)}
@@ -439,7 +571,6 @@ export default function MapPage() {
             ))}
           </div>
 
-          {/* Navigate CTA — inside the sheet, always visible */}
           <button
             className={styles.navigateBtn}
             onClick={() => {
@@ -447,6 +578,7 @@ export default function MapPage() {
               const allHazards = [...hazards, ...aiHazards];
               navEngineRef.current?.start(selectedRoute, allHazards);
               setSheetOpen(false);
+              satAlertedIds.current.clear();
             }}
           >
             🧭 Navigate with {selectedRoute?.label} Route

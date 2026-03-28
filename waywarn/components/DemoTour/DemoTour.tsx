@@ -516,8 +516,8 @@ export default function DemoTour({
 
         {/* ── Footer navigation ── */}
         <div className={styles.footer}>
-          <button className={styles.skipBtn} onClick={onSkip}>
-            Skip tour
+          <button className={styles.skipBtn} onClick={onSkip} title="Skip the guide and jump straight to the demo">
+            Skip → Run Demo
           </button>
 
           <div className={styles.stepDots}>

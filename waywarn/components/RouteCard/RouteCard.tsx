@@ -11,17 +11,26 @@ interface RouteCardProps {
 }
 
 const LABEL_META = {
-  Safest:   { emoji: "🟢", desc: "Fewest hazards" },
-  Fastest:  { emoji: "⚡", desc: "Quickest arrival" },
-  Shortest: { emoji: "📏", desc: "Minimum distance" },
+  Safest:       { emoji: "🟢", desc: "Fewest hazards" },
+  Fastest:      { emoji: "⚡", desc: "Quickest arrival" },
+  Shortest:     { emoji: "📏", desc: "Minimum distance" },
+  "Weather-Safe": { emoji: "🌤️", desc: "Lowest env risk" },
 };
 
+function envRiskLevel(score: number): { label: string; color: string } {
+  if (score >= 65) return { label: "High",     color: "#ef4444" };
+  if (score >= 35) return { label: "Moderate", color: "#f97316" };
+  return               { label: "Low",      color: "#22c55e" };
+}
+
 export default function RouteCard({ route, isSelected, onSelect }: RouteCardProps) {
-  const meta = LABEL_META[route.label];
+  const meta = LABEL_META[route.label] ?? LABEL_META["Fastest"];
   const riskColor =
     route.riskScore < 30 ? "var(--safe)" :
     route.riskScore < 65 ? "var(--warning)" :
     "var(--danger)";
+
+  const env = route.envRisk !== undefined ? envRiskLevel(route.envRisk) : null;
 
   return (
     <motion.div
@@ -80,6 +89,29 @@ export default function RouteCard({ route, isSelected, onSelect }: RouteCardProp
           {route.riskScore}
         </span>
       </div>
+
+      {/* Environmental Risk — shown only when satellite layer has data */}
+      {env && (
+        <div className={styles.envRow}>
+          <span className={styles.envIcon}>🛰️</span>
+          <span className={styles.envLabel}>Env Risk</span>
+          <div className={styles.envBar}>
+            <motion.div
+              className={styles.envFill}
+              initial={{ width: 0 }}
+              animate={{ width: `${route.envRisk}%` }}
+              transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
+              style={{ background: env.color }}
+            />
+          </div>
+          <span
+            className={styles.envChip}
+            style={{ background: env.color + "22", color: env.color, borderColor: env.color + "55" }}
+          >
+            {env.label}
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 }

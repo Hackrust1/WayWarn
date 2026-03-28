@@ -32,7 +32,7 @@ export interface Hazard {
 }
 
 // --- Route ---
-export type RouteLabel = "Safest" | "Fastest" | "Shortest";
+export type RouteLabel = "Safest" | "Fastest" | "Shortest" | "Weather-Safe";
 
 export interface Route {
   id: string;
@@ -43,6 +43,7 @@ export interface Route {
   hazardCount: number;
   riskScore: number; // 0–100
   color: string; // CSS color string
+  envRisk?: number; // 0–100 environmental/satellite risk
 }
 
 // --- Navigation ---
@@ -98,4 +99,24 @@ export interface WeatherData {
   isRaining: boolean;
   description: string;
   city: string;
+}
+
+// --- Satellite Hazard Intelligence ---
+export type SatelliteZoneType = "flood" | "waterlog" | "landslide" | "blockage";
+export type TrustTag =
+  | "Satellite Estimated Risk"
+  | "Weather-Driven Alert"
+  | "Crowd + AI Verified";
+
+export interface SatelliteZone {
+  id: string;
+  type: SatelliteZoneType;
+  center: LatLng;
+  radiusKm: number;
+  riskScore: number;       // 0–1
+  riskLevel: "low" | "moderate" | "high";
+  label: string;           // short human-readable name
+  trustTag: TrustTag;
+  color: string;           // CSS color for Leaflet overlay
+  alertMessage: string;    // TTS message
 }
