@@ -58,6 +58,8 @@ export default function MapPage() {
   const polylineRefs = useRef<LPolyline[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const aiMarkerRefs = useRef<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hazardMarkerRefs = useRef<any[]>([]);
 
   const [searchLoading, setSearchLoading] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -104,8 +106,12 @@ export default function MapPage() {
 
   // Load nearby hazards + weather on mount
   useEffect(() => {
-    fetchHazards({ lat: DELHI.lat, lng: DELHI.lng }).then(setHazards);
+    fetchHazards({ lat: DELHI.lat, lng: DELHI.lng }).then((h) => {
+      setHazards(h);
+      drawHazardMarkers(h);
+    });
     fetchWeather(DELHI.lat, DELHI.lng).then(setWeather);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleMapReady = useCallback((map: LMap) => {
@@ -184,37 +190,113 @@ export default function MapPage() {
     []
   );
 
-  // ── Draw AI pothole markers ────────────────────────────────────────────
-  const drawAiMarkers = useCallback(async (aiPotholes: Hazard[]) => {
-    if (!mapRef.current || !aiPotholes.length) return;
+  // ── Draw colour-coded community hazard markers ────────────────────────
+  const drawHazardMarkers = useCallback(async (hazardList: Hazard[]) => {
+    if (!mapRef.current) return;
+    const L = (await import("leaflet")).default;
+
+    hazardMarkerRefs.current.forEach((m) => m.remove());
+    hazardMarkerRefs.current = [];
+
+    // Severity palette
+    const SEV_COLOR: Record<string, { bg: string; border: string; glow: string; label: string }> = {
+      low:    { bg: "rgba(34,197,94,0.85)",  border: "#86efac", glow: "rgba(34,197,94,0.5)",  label: "🟢 Low" },
+      medium: { bg: "rgba(251,191,36,0.9)",  border: "#fde68a", glow: "rgba(251,191,36,0.5)", label: "🟡 Medium" },
+      high:   { bg: "rgba(239,68,68,0.9)",   border: "#fca5a5", glow: "rgba(239,68,68,0.6)",  label: "🔴 High" },
+    };
+
+    hazardList.forEach((h) => {
+      const c = SEV_COLOR[h.severity] ?? SEV_COLOR.medium;
+      const typeLabel = h.type.replace(/_/g, " ");
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:16px;height:16px;
+          background:${c.bg};
+          border:2.5px solid ${c.border};
+          border-radius:50%;
+          box-shadow:0 0 8px ${c.glow},0 0 18px ${c.glow};
+          position:relative;
+        "><div style="
+          position:absolute;inset:-5px;
+          border-radius:50%;
+          border:1.5px solid ${c.border};
+          opacity:0.4;
+        "></div></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+      const ts = new Date(h.timestamp).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+      const marker = L.marker([h.location.lat, h.location.lng], { icon })
+        .addTo(mapRef.current!)
+        .bindPopup(
+          `<b>${c.label} — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)}</b><br/>` +
+          `${h.notes ? h.notes + "<br/>" : ""}` +
+          `Reported: ${ts}`
+        );
+      hazardMarkerRefs.current.push(marker);
+    });
+  }, []);
+
+  // ── Draw AI predicted hazard markers (type + severity colour-coded) ────
+  const drawAiMarkers = useCallback(async (aiHazardList: Hazard[]) => {
+    if (!mapRef.current || !aiHazardList.length) return;
     const L = (await import("leaflet")).default;
 
     aiMarkerRefs.current.forEach((m) => m.remove());
     aiMarkerRefs.current = [];
 
-    aiPotholes.forEach((h) => {
+    // Severity → glow colour ring
+    const SEV: Record<string, { ring: string; shadow: string }> = {
+      low:    { ring: "#86efac", shadow: "rgba(34,197,94,0.55)" },
+      medium: { ring: "#fde68a", shadow: "rgba(251,191,36,0.6)" },
+      high:   { ring: "#fca5a5", shadow: "rgba(239,68,68,0.7)" },
+    };
+
+    // Emoji + label per hazard type
+    const TYPE_META: Record<string, { emoji: string; label: string; bg: string }> = {
+      pothole:       { emoji: "🕳️", label: "Pothole",           bg: "rgba(239,68,68,0.15)" },
+      crack:         { emoji: "⚠️", label: "Road Crack",         bg: "rgba(251,191,36,0.15)" },
+      waterlog:      { emoji: "💧", label: "Waterlogging",       bg: "rgba(59,130,246,0.18)" },
+      debris:        { emoji: "🚧", label: "Construction Zone",  bg: "rgba(217,119,6,0.18)" },
+      speed_breaker: { emoji: "⛰️", label: "Speed Breaker",      bg: "rgba(168,85,247,0.18)" },
+    };
+
+    aiHazardList.forEach((h) => {
       const conf = Math.round((h.aiConfidence ?? 0.7) * 100);
+      const s = SEV[h.severity] ?? SEV.medium;
+      const t = TYPE_META[h.type] ?? TYPE_META.pothole;
+      const sevLabel = h.severity.charAt(0).toUpperCase() + h.severity.slice(1);
+
+      // Each type renders as a labelled emoji badge with a severity-coloured glow ring
       const icon = L.divIcon({
         className: "",
         html: `<div style="
-          width:14px;height:14px;
-          background:rgba(168,85,247,0.9);
-          border:2px solid #c084fc;
-          border-radius:50%;
-          box-shadow:0 0 8px rgba(168,85,247,0.8),0 0 20px rgba(168,85,247,0.4);
           position:relative;
-        "><div style="
-          position:absolute;inset:-6px;
-          border-radius:50%;
-          border:1px solid rgba(168,85,247,0.4);
-          animation:pulse-ring 1.4s ease-out infinite;
-        "></div></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+          width:28px;height:28px;
+          display:flex;align-items:center;justify-content:center;
+        ">
+          <div style="
+            position:absolute;inset:0;
+            border-radius:50%;
+            background:${t.bg};
+            border:2px solid ${s.ring};
+            box-shadow:0 0 8px ${s.shadow},0 0 16px ${s.shadow};
+            animation:pulse-ring 1.8s ease-in-out infinite;
+          "></div>
+          <span style="position:relative;font-size:14px;line-height:1;">${t.emoji}</span>
+        </div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       });
+
       const marker = L.marker([h.location.lat, h.location.lng], { icon })
         .addTo(mapRef.current!)
-        .bindPopup(`<b>🤖 AI Predicted Pothole</b><br/>Severity: ${h.severity}<br/>Confidence: ${conf}%`);
+        .bindPopup(
+          `<b>🤖 AI Predicted — ${t.label}</b><br/>` +
+          `Severity: ${sevLabel} &nbsp;|&nbsp; Confidence: ${conf}%<br/>` +
+          `<i style="font-size:0.8em;color:#666">${h.notes ?? ""}</i>`
+        );
       aiMarkerRefs.current.push(marker);
     });
   }, []);

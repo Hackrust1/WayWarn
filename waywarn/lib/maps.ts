@@ -85,30 +85,77 @@ export function buildRoutes(
 ): Route[] {
   if (!osrmRoutes.length) return [];
 
-  const labels: RouteLabel[] = ["Fastest", "Shortest", "Safest"];
-
-  // Score = 0–100; lower hazards & similar distance = safer
   const maxHazards = Math.max(...hazardCounts, 1);
 
-  return osrmRoutes.slice(0, 3).map((r, i) => {
-    const distKm = r.distance / 1000;
-    const etaMin = Math.ceil(r.duration / 60);
-    const hCount = hazardCounts[i] ?? 0;
+  // Build raw scored objects
+  const raw = osrmRoutes.slice(0, 3).map((r, i) => {
+    const distKm     = parseFloat((r.distance / 1000).toFixed(2));
+    const etaMin     = Math.ceil(r.duration / 60);
+    const hCount     = hazardCounts[i] ?? 0;
     const hazardRatio = hCount / maxHazards;
-    const riskScore = Math.round(hazardRatio * 70 + Math.random() * 15);
-
-    const label = labels[i] as RouteLabel;
-    const coords = osrmCoordsToLatLng(r.geometry.coordinates);
-
+    const riskScore  = Math.min(Math.round(hazardRatio * 70 + Math.random() * 15), 100);
     return {
-      id: `route-${i}`,
-      label,
-      coordinates: coords,
-      distanceKm: parseFloat(distKm.toFixed(2)),
-      etaMinutes: etaMin,
-      hazardCount: hCount,
-      riskScore: Math.min(riskScore, 100),
-      color: ROUTE_COLORS[label],
+      idx: i,
+      distKm,
+      etaMin,
+      hCount,
+      riskScore,
+      coords: osrmCoordsToLatLng(r.geometry.coordinates),
     };
   });
+
+  // ── Semantic label assignment (works for 1, 2 or 3 routes) ──────────────
+  const n = raw.length;
+
+  // For a single route, just call it Safest
+  if (n === 1) {
+    const r = raw[0];
+    return [{
+      id: "route-0", label: "Safest",
+      coordinates: r.coords, distanceKm: r.distKm, etaMinutes: r.etaMin,
+      hazardCount: r.hCount, riskScore: r.riskScore, color: ROUTE_COLORS["Safest"],
+    }];
+  }
+
+  // For 2+ routes: Fastest = lowest ETA
+  const fastestIdx = raw.reduce((best, r) => r.etaMin < raw[best].idx ? r.idx : best, raw[0].idx);
+  const remaining1 = raw.filter(r => r.idx !== fastestIdx);
+
+  if (n === 2) {
+    // 2 routes: Fastest + Safest
+    const safestIdx = remaining1[0].idx;
+    const labelMap: Record<number, RouteLabel> = {
+      [fastestIdx]: "Fastest",
+      [safestIdx]:  "Safest",
+    };
+    return raw.map(r => ({
+      id: `route-${r.idx}`, label: labelMap[r.idx],
+      coordinates: r.coords, distanceKm: r.distKm, etaMinutes: r.etaMin,
+      hazardCount: r.hCount, riskScore: r.riskScore, color: ROUTE_COLORS[labelMap[r.idx]],
+    }));
+  }
+
+  // 3 routes: Fastest + Shortest (lowest dist among rest) + Safest
+  const shortestIdx = remaining1.reduce(
+    (best, r) => r.distKm < best.distKm ? r : best,
+    remaining1[0]
+  ).idx;
+  const safestIdx = raw.find(r => r.idx !== fastestIdx && r.idx !== shortestIdx)!.idx;
+
+  const labelMap: Record<number, RouteLabel> = {
+    [fastestIdx]:  "Fastest",
+    [shortestIdx]: "Shortest",
+    [safestIdx]:   "Safest",
+  };
+
+  return raw.map(r => ({
+    id:          `route-${r.idx}`,
+    label:       labelMap[r.idx],
+    coordinates: r.coords,
+    distanceKm:  r.distKm,
+    etaMinutes:  r.etaMin,
+    hazardCount: r.hCount,
+    riskScore:   r.riskScore,
+    color:       ROUTE_COLORS[labelMap[r.idx]],
+  }));
 }

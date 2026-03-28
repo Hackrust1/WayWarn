@@ -102,6 +102,12 @@ function constructionProb(z: ZoneScores): number {
   return z.urban * 0.60 + z.junction * 0.20 + 0.05;
 }
 
+function speedBreakerProb(z: ZoneScores): number {
+  // Speed breakers = junctions, schools, markets in urban areas
+  // Very common in Indian cities — installed without road markings
+  return z.junction * 0.65 + z.urban * 0.40 + 0.08;
+}
+
 // Pick the best hazard type for this zone, plus a combined probability
 function pickHazardType(
   z: ZoneScores,
@@ -111,22 +117,21 @@ function pickHazardType(
     pothole:       potholeProb(z),
     crack:         crackProb(z),
     waterlog:      waterlogProb(z),
-    debris:        constructionProb(z),  // using "debris" for construction
-    speed_breaker: 0,                    // not AI-predicted
+    debris:        constructionProb(z),
+    speed_breaker: speedBreakerProb(z),
   };
 
-  // In most buckets, just pick the dominant type; occasionally sample from all
+  // In most buckets pick the dominant type; occasionally sample all for variety
   const roll = rng();
   let type: HazardType;
 
-  if (roll < 0.15) {
-    // 15% chance: randomly pick any type (variety)
-    const all: HazardType[] = ["pothole", "crack", "waterlog", "debris"];
-    type = all[Math.floor(rng() * 4)];
+  if (roll < 0.18) {
+    // 18% chance: randomly pick any type (variety)
+    const all: HazardType[] = ["pothole", "crack", "waterlog", "debris", "speed_breaker"];
+    type = all[Math.floor(rng() * all.length)];
   } else {
-    // 85%: pick the most likely type for this zone
+    // 82%: pick the most likely type for this zone
     type = (Object.entries(scores) as [HazardType, number][])
-      .filter(([t]) => t !== "speed_breaker")
       .sort((a, b) => b[1] - a[1])[0][0];
   }
 
@@ -142,14 +147,35 @@ function severityFromScore(s: number): "low" | "medium" | "high" {
   return s > 0.75 ? "high" : s > 0.55 ? "medium" : "low";
 }
 
-// ─── Hazard notes ─────────────────────────────────────────────────────────────
-const HAZARD_LABELS: Record<HazardType, string> = {
-  pothole:       "Pothole",
-  crack:         "Road crack",
-  waterlog:      "Waterlogged road",
-  debris:        "Construction zone",
-  speed_breaker: "Speed breaker",
-};
+// ─── Realistic contextual notes per hazard type ──────────────────────────────
+function buildNote(
+  type: HazardType,
+  score: number,
+  z: ZoneScores,
+  rng: () => number
+): string {
+  const riskPct = Math.round(score * 100);
+  const ctx = z.urban > 0.7 ? "urban area" : z.urban > 0.3 ? "peri-urban stretch" : "rural road";
+  const jx  = z.junction > 0.5 ? "near junction" : null;
+  const ms  = z.monsoon  > 0.7 ? "monsoon-prone zone" : null;
+  const tags = [ctx, jx, ms].filter(Boolean).join(" · ");
+
+  // Contextual flavour pools per type
+  const POTHOLE_CTX  = ["after heavy vehicle damage", "post-monsoon patching failed", "asphalt thermal cracking", "drain overflow erosion"];
+  const CRACK_CTX    = ["longitudinal crack — road age >5 yrs", "settlement crack near utility trench", "fatigue cracking from bus route", "shoulder crack near kerb"];
+  const WATER_CTX    = ["blocked storm drain", "low-lying stretch floods in rain", "road camber too flat", "utility work disrupted drainage"];
+  const DEBRIS_CTX   = ["active construction — lane narrowing", "overpass foundation work", "metro rail Phase-II corridor", "flyover expansion project", "utility cable trench open"];
+  const SPEED_CTX    = ["unmarked speed breaker near school", "speed hump at colony entrance", "table-top crossing near market", "rumble strip before intersection", "unofficial speed bump — low visibility at night"];
+
+  const pool = type === "pothole" ? POTHOLE_CTX
+    : type === "crack"         ? CRACK_CTX
+    : type === "waterlog"      ? WATER_CTX
+    : type === "debris"        ? DEBRIS_CTX
+    : SPEED_CTX;
+
+  const flavour = pool[Math.floor(rng() * pool.length)];
+  return `AI Predicted · ${riskPct}% risk · ${flavour} · ${tags}`;
+}
 
 // ─── Cumulative distance array ────────────────────────────────────────────────
 function buildCumDist(coords: LatLng[]): number[] {
@@ -179,8 +205,9 @@ export async function predictPotholes(
   const rng = makePRNG(s0 ^ (sN * 31));
 
   const actualKm = totalM / 1000;
-  const bucketM  = actualKm > 20 ? 700 : actualKm > 5 ? 500 : 350;
-  const nBuckets = Math.max(3, Math.round(totalM / bucketM));
+  // More buckets → more predictions visible per route
+  const bucketM  = actualKm > 20 ? 600 : actualKm > 5 ? 450 : 300;
+  const nBuckets = Math.max(4, Math.round(totalM / bucketM));
 
   const results: Hazard[] = [];
 
@@ -216,23 +243,18 @@ export async function predictPotholes(
     const jitterLat = (rng() - 0.5) * 0.00015;
     const jitterLng = (rng() - 0.5) * 0.00015;
 
-    const score = (type === "pothole" ? potholeProb(z)
-      : type === "crack"    ? crackProb(z)
-      : type === "waterlog" ? waterlogProb(z)
+    const score = (type === "pothole"       ? potholeProb(z)
+      : type === "crack"         ? crackProb(z)
+      : type === "waterlog"      ? waterlogProb(z)
+      : type === "speed_breaker" ? speedBreakerProb(z)
       : constructionProb(z));
-
-    const tags = [
-      z.urban > 0.7 ? "urban" : "rural",
-      z.monsoon > 0.7 ? "monsoon zone" : null,
-      z.junction > 0.5 ? "near junction" : null,
-    ].filter(Boolean).join(" · ");
 
     results.push({
       id: `ai-${s0}-b${b}`,
       type,
       severity: severityFromScore(score),
       location: { lat: mid.lat + jitterLat, lng: mid.lng + jitterLng },
-      notes: `AI: ${HAZARD_LABELS[type]} · ${Math.round(score * 100)}% risk · ${tags}`,
+      notes: buildNote(type, score, z, rng),
       timestamp: Date.now(),
       aiConfidence: parseFloat(score.toFixed(3)),
       isAIPredicted: true,
