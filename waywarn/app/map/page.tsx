@@ -20,6 +20,7 @@ import { NavigationEngine, createGpsDotIcon } from "@/lib/navigation";
 import AlertModal from "@/components/AlertModal/AlertModal";
 import { AlertItem, NavigationState } from "@/types";
 import { saveRoutes, saveSelectedRoute } from "@/lib/routeStore";
+import { saveAlertToHistory } from "@/lib/storage";
 import Speedometer from "@/components/Speedometer/Speedometer";
 import { LatLng } from "@/types";
 import { fetchWeather, WeatherFactor } from "@/lib/weatherApi";
@@ -130,6 +131,16 @@ export default function MapPage() {
       },
       (alert: AlertItem) => {
         setActiveAlert(alert);
+        // Persist to IndexedDB so it shows on the Alerts history page
+        const h = alert.hazard;
+        const distM = Math.round(alert.distanceMeters);
+        const typeLabel = h.type.replace(/_/g, " ");
+        saveAlertToHistory({
+          id: alert.id,
+          message: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} — ${h.severity} severity, ${distM}m ahead`,
+          timestamp: alert.timestamp,
+          hazardType: h.type,
+        });
       }
     );
   }, []);

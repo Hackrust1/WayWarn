@@ -84,7 +84,7 @@ export default function SearchBar({ onSearch, loading = false }: SearchBarProps)
           <span className={styles.searchIcon}>🔍</span>
           <input
             className={styles.input}
-            placeholder="Where to? (tap to plan route)"
+            placeholder="🔍 Search a destination to plan your route…"
             value=""
             readOnly
             onFocus={handleExpand}
@@ -107,7 +107,7 @@ export default function SearchBar({ onSearch, loading = false }: SearchBarProps)
             <input
               ref={originRef}
               className={styles.input}
-              placeholder="From (e.g. Connaught Place, Delhi)"
+              placeholder="📍 Start — e.g. Connaught Place, Delhi"
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && destRef.current?.focus()}
@@ -131,7 +131,7 @@ export default function SearchBar({ onSearch, loading = false }: SearchBarProps)
             <input
               ref={destRef}
               className={styles.input}
-              placeholder="To (e.g. India Gate, Delhi)"
+              placeholder="🏁 Destination — e.g. India Gate, Delhi"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}

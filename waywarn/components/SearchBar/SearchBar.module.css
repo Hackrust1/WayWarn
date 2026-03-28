@@ -51,7 +51,7 @@
 }
 
 .input::placeholder {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.55);
   font-size: 0.875rem;
 }
 
