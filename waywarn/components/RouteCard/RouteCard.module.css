@@ -1,0 +1,110 @@
+.card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card.selected {
+  box-shadow: 0 0 0 1px currentColor, 0 4px 20px rgba(108, 99, 255, 0.2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.labelEmoji { font-size: 1rem; }
+
+.label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.activeBadge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: rgba(108, 99, 255, 0.15);
+  color: var(--accent-light);
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.statVal {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.statDivider {
+  width: 1px;
+  height: 28px;
+  background: var(--glass-border);
+}
+
+/* Risk bar */
+.riskWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.riskLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.riskBar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.riskFill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.riskScore {
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 22px;
+  text-align: right;
+  flex-shrink: 0;
+}
