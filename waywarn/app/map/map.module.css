@@ -506,6 +506,33 @@
   color: var(--text-muted);
 }
 
+.recentreBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(108, 99, 255, 0.12);
+  border: 1.5px solid rgba(108, 99, 255, 0.45);
+  color: #fff;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 0 10px rgba(108, 99, 255, 0.25);
+}
+
+.recentreBtn:hover {
+  background: rgba(108, 99, 255, 0.22);
+  box-shadow: 0 0 16px rgba(108, 99, 255, 0.45);
+  transform: scale(1.08);
+}
+
+.recentreBtn:active {
+  transform: scale(0.95);
+}
+
 .stopBtn {
   background: rgba(220, 38, 38, 0.08);
   border: 1.5px solid rgba(220, 38, 38, 0.3);

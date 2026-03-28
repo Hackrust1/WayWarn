@@ -76,6 +76,9 @@ export default function MapPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gpsDotRef = useRef<any>(null);
   const navEngineRef = useRef<NavigationEngine | null>(null);
+  // Ref mirrors activeAlert so the stable handleMapReady closure can read it
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activeAlertRef = useRef<AlertItem | null>(null);
 
   // ── Satellite Intelligence State ──────────────────────────────────────────
   const [satelliteEnabled, setSatelliteEnabled] = useState(false);
@@ -134,8 +137,21 @@ export default function MapPage() {
           gpsDotRef.current.remove();
           gpsDotRef.current = null;
         }
+
+        // Dismiss active alert once the hazard is no longer in the look-ahead window
+        // (i.e., GPS has passed it)
+        if (activeAlertRef.current && state.nearbyHazards) {
+          const stillAhead = state.nearbyHazards.some(
+            (h) => h.id === activeAlertRef.current?.hazard.id
+          );
+          if (!stillAhead) {
+            activeAlertRef.current = null;
+            setActiveAlert(null);
+          }
+        }
       },
       (alert: AlertItem) => {
+        activeAlertRef.current = alert;
         setActiveAlert(alert);
         // Persist to IndexedDB so it shows on the Alerts history page
         const h = alert.hazard;
@@ -629,6 +645,21 @@ export default function MapPage() {
               {Math.round((navEngineRef.current?.getProgress() ?? 0) * 100)}% complete
             </span>
           </div>
+
+          {/* Re-centre button */}
+          <button
+            className={styles.recentreBtn}
+            title="Re-centre map on your position"
+            onClick={() => {
+              const pos = navEngineRef.current?.getCurrentPosition();
+              if (pos && mapRef.current) {
+                mapRef.current.setView([pos.lat, pos.lng], 16, { animate: true });
+              }
+            }}
+          >
+            🎯
+          </button>
+
           <button
             className={styles.stopBtn}
             onClick={() => {
@@ -642,10 +673,12 @@ export default function MapPage() {
         </div>
       )}
 
+
       {/* Proximity alert toast (road hazards) */}
       <AlertModal
         alert={activeAlert}
-        onDismiss={() => setActiveAlert(null)}
+        onDismiss={() => { activeAlertRef.current = null; setActiveAlert(null); }}
+        autoDismissMs={navState?.isActive ? 0 : 3000}
       />
 
       {/* Route cards bottom sheet */}

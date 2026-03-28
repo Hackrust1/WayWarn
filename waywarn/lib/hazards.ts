@@ -57,11 +57,11 @@ const DEMO_HAZARDS: Hazard[] = [
 
 // Hazard type emoji map
 export const HAZARD_EMOJI: Record<HazardType, string> = {
-  pothole:      "🕳️",
-  crack:        "🗯️",
-  waterlog:     "💧",
-  speed_breaker:"⛰️",
-  debris:       "🪨",
+  pothole:       "🕳️",
+  crack:         "⚠️",
+  waterlog:      "💧",
+  speed_breaker: "⛰️",
+  debris:        "🚧",
 };
 
 // Severity to risk weight

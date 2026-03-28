@@ -10,9 +10,10 @@ import { findNearbyHazards } from "./hazards";
 export type NavCallback = (state: NavigationState) => void;
 export type AlertCallback = (alert: AlertItem) => void;
 
-const ALERT_RADIUS_METRES = 50;
-const SLOWDOWN_RADIUS_METRES = 30;
-const MAX_QUEUED_ALERTS = 3;
+const ALERT_AHEAD_METRES  = 100;    // fire alert when hazard is ≤100m ahead on path
+const SLOWDOWN_RADIUS_METRES = 20;  // speed reduces within 20m of hazard
+const LOOK_AHEAD_COORDS   = 30;    // how many upcoming coords to scan each tick
+const ALERT_COOLDOWN_MS   = 1500;  // min gap between consecutive toasts
 
 // Speed constants (km/h)
 const BASE_SPEED_MIN = 32;
@@ -24,9 +25,10 @@ export class NavigationEngine {
   private route: Route | null = null;
   private hazards: Hazard[] = [];
   private currentIndex = 0;
+  private prevIndex = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private alertedIds = new Set<string>();
-  private alertQueue: string[] = [];
+  private lastAlertTime = 0;
   private onStateChange: NavCallback;
   private onAlert: AlertCallback;
   private isRunning = false;
@@ -43,8 +45,9 @@ export class NavigationEngine {
     this.route = route;
     this.hazards = hazards;
     this.currentIndex = 0;
+    this.prevIndex = 0;
     this.alertedIds.clear();
-    this.alertQueue = [];
+    this.lastAlertTime = 0;
     this.isRunning = true;
     this.currentSpeed = BASE_SPEED_MIN + Math.random() * (BASE_SPEED_MAX - BASE_SPEED_MIN);
     this.targetSpeed = this.currentSpeed;
@@ -74,33 +77,53 @@ export class NavigationEngine {
 
     const coords = this.route.coordinates;
     if (this.currentIndex >= coords.length) {
-      // Reached destination
       this.stop();
       return;
     }
 
     const currentPos = coords[this.currentIndex];
 
-    // Find hazards within alert radius
-    const nearby = findNearbyHazards(this.hazards, currentPos, ALERT_RADIUS_METRES);
+    // ── Look-ahead scan: find hazards on the UPCOMING path ──────────────
+    // Walk the next LOOK_AHEAD_COORDS points, accumulate distance from
+    // currentPos, and collect any hazard whose closest route-point is within
+    // ALERT_AHEAD_METRES on the path ahead. This fires the alert before the
+    // GPS reaches the hazard, regardless of coordinate spacing.
+    const detectedMap = new Map<string, { hazard: Hazard; distanceMetres: number }>();
+    let cumulativeDist = 0;
+    const lookAheadEnd = Math.min(this.currentIndex + LOOK_AHEAD_COORDS, coords.length - 1);
 
-    // Find hazards within slow-down radius
+    for (let i = this.currentIndex; i < lookAheadEnd; i++) {
+      if (i > this.currentIndex) {
+        cumulativeDist += haversineMetres(coords[i - 1], coords[i]);
+      }
+      if (cumulativeDist > ALERT_AHEAD_METRES) break; // past the look-ahead window
+
+      for (const entry of findNearbyHazards(this.hazards, coords[i], 30)) {
+        if (!detectedMap.has(entry.hazard.id)) {
+          // Report the cumulative path distance, not radial distance
+          detectedMap.set(entry.hazard.id, {
+            hazard: entry.hazard,
+            distanceMetres: Math.max(cumulativeDist, entry.distanceMetres),
+          });
+        }
+      }
+    }
+    const nearby = Array.from(detectedMap.values());
+
+    // Check slow-down zone at current position
     const closeHazards = findNearbyHazards(this.hazards, currentPos, SLOWDOWN_RADIUS_METRES);
     const isSlowingDown = closeHazards.length > 0;
 
-    // Determine target speed based on proximity
+    // Speed lerp
     if (isSlowingDown) {
       this.targetSpeed = SLOW_SPEED_MIN + Math.random() * (SLOW_SPEED_MAX - SLOW_SPEED_MIN);
     } else {
-      // Drift naturally within normal range for realism
       this.targetSpeed = BASE_SPEED_MIN + Math.random() * (BASE_SPEED_MAX - BASE_SPEED_MIN);
     }
-
-    // Lerp current speed toward target (smooth transition)
     const lerpFactor = isSlowingDown ? 0.45 : 0.2;
     this.currentSpeed = this.currentSpeed + (this.targetSpeed - this.currentSpeed) * lerpFactor;
 
-    // Emit state update (for moving dot on map + speedometer)
+    // Emit state
     this.onStateChange({
       isActive: true,
       currentRoute: this.route,
@@ -111,29 +134,43 @@ export class NavigationEngine {
       isSlowingDown,
     });
 
-    // Emit alerts for new hazards (deduplicated, max 3 queued)
+    // ── Fire an alert for every new hazard detected ───────────────────────
+    const now = Date.now();
     for (const { hazard, distanceMetres } of nearby) {
-      if (
-        !this.alertedIds.has(hazard.id) &&
-        this.alertQueue.length < MAX_QUEUED_ALERTS
-      ) {
-        this.alertedIds.add(hazard.id);
-        this.alertQueue.push(hazard.id);
+      if (this.alertedIds.has(hazard.id)) continue;           // already alerted
 
-        const alert: AlertItem = {
-          id: `alert-${Date.now()}-${hazard.id}`,
+      // Respect cooldown so toasts don't stack visually
+      if (now - this.lastAlertTime < ALERT_COOLDOWN_MS) {
+        // Schedule a deferred alert after the cooldown expires
+        const delay = ALERT_COOLDOWN_MS - (now - this.lastAlertTime) + 100;
+        setTimeout(() => {
+          if (!this.alertedIds.has(hazard.id)) {
+            this.alertedIds.add(hazard.id);
+            this.lastAlertTime = Date.now();
+            this.onAlert({
+              id: `alert-${Date.now()}-${hazard.id}`,
+              hazard,
+              distanceMeters: distanceMetres,
+              timestamp: Date.now(),
+            });
+          }
+        }, delay);
+      } else {
+        this.alertedIds.add(hazard.id);
+        this.lastAlertTime = now;
+        this.onAlert({
+          id: `alert-${now}-${hazard.id}`,
           hazard,
           distanceMeters: distanceMetres,
-          timestamp: Date.now(),
-        };
-        this.onAlert(alert);
+          timestamp: now,
+        });
       }
     }
 
-    // Advance position — skip every 3 points for speed (demo feel)
-    this.currentIndex += 3;
+    // Advance GPS position (2 coords/tick for fine resolution)
+    this.prevIndex = this.currentIndex;
+    this.currentIndex += 2;
 
-    // Random interval: 1000–1500ms
     const interval = 1000 + Math.random() * 500;
     this.timer = setTimeout(() => this.tick(), interval);
   }
@@ -148,6 +185,7 @@ export class NavigationEngine {
     return this.route.coordinates[this.currentIndex];
   }
 }
+
 
 // Helper: create glowing GPS dot icon
 export function createGpsDotIcon(L: typeof import("leaflet")) {
